@@ -157,6 +157,10 @@ CROB_LATCH_OFF    = 0x04
 CROB_TRIP         = 0x81
 CROB_CLOSE        = 0x41
 
+# Status do CROB na resposta de SELECT/OPERATE (IEEE 1815, g12v1)
+CROB_STATUS_SUCCESS   = 0
+CROB_STATUS_NO_SELECT = 2   # OPERATE sem SELECT valido (ou divergente do selecionado)
+
 
 @dataclass
 class DNP3Object:
@@ -165,6 +169,7 @@ class DNP3Object:
     value: Any = None
     flags: int = FLAG_ONLINE
     timestamp: Optional[int] = None   # ms desde a epoca (DNP3 usa 48 bits)
+    status: int = 0                   # status do CROB na resposta (0 = sucesso)
 
 
 @dataclass
@@ -268,9 +273,15 @@ class DNP3Codec:
             # nada aproveitavel; guarda no maximo 1 byte para o caso de 0x05 solto
             return None, buf[-1:] if buf else b''
         buf = buf[start:]
+        if len(buf) < 3:
+            return None, buf                 # cabecalho incompleto: aguarda o byte de LEN
         total = DNP3Codec.frame_length(buf)
-        if total is None or len(buf) < total:
-            return None, buf
+        if total is None:
+            # START valido mas LEN invalido (<5): marcador corrompido. Descarta este
+            # START e ressincroniza no proximo, em vez de ficar preso no mesmo prefixo.
+            return None, buf[2:]
+        if len(buf) < total:
+            return None, buf                 # frame incompleto: aguarda mais bytes
         return buf[:total], buf[total:]
 
     # ------------------------------------------------------------------
@@ -425,7 +436,7 @@ class DNP3Codec:
         if g == ObjectGroup.BINARY_OUTPUT_CMD:    # g12v1 CROB
             code = int(o.value) if o.value is not None else CROB_NUL
             # control code, count, on-time, off-time, status
-            return bytes([code, 1]) + struct.pack('<IIB', 100, 100, 0)
+            return bytes([code, 1]) + struct.pack('<IIB', 100, 100, o.status & 0xFF)
 
         if g == ObjectGroup.ANALOG_OUTPUT_CMD:    # g41v3 float
             return struct.pack('<f', float(o.value)) + bytes([0])

@@ -42,6 +42,7 @@ class OPCUAVariable:
         self.node = None
         self._phase = random.random() * math.tau
         self._t0 = time.time()
+        self._last_node = None     # ultimo valor que o SERVIDOR escreveu no no
         # Binding ao modelo de processo (Passo 2).
         self._model = None
         self._model_signal = None
@@ -163,18 +164,37 @@ class OPCUAServer(BaseProtocolGenerator):
             interval = self._load_profile.next_interval(self.update_interval)
             await asyncio.sleep(interval)
 
-            alterados = 0
-            for v in self.variaveis:
-                anterior = v.valor
-                novo = v.atualizar()
-                if novo != anterior:
-                    await v.node.write_value(novo)
-                    alterados += 1
-                    # Cada escrita gera notificacao DataChange para os
-                    # clientes inscritos: contabilizamos como trafego enviado.
-                    self.stats.record_sent(self._estimate_size(novo))
+            alterados = sum([1 for v in self.variaveis if await self._sync_node(v)])
             if alterados:
                 logger.debug(f"  {alterados} no(s) atualizado(s)")
+
+    async def _sync_node(self, v: OPCUAVariable) -> bool:
+        """Reconcilia um no: detecta escrita do cliente e publica o valor do servidor.
+
+        Passo 1 -- escrita do cliente? O no divergiu do ultimo valor que o SERVIDOR
+        escreveu. Roteia pelo apply_write: no de comando (is_input) -> model.command()
+        ACIONA a planta; telemetria amarrada ao modelo e reconciliada no passo 2
+        (o valor real volta no proximo tick, entao a escrita nao "cola").
+        Passo 2 -- evolui a fisica (ou empurra o valor do modelo) e publica.
+        Devolve True se publicou um DataChange.
+        """
+        try:
+            no_val = await v.node.read_value()
+        except Exception:
+            no_val = v.valor
+        if v._last_node is not None and no_val != v._last_node:
+            v.apply_write(no_val)
+            v._last_node = no_val                # reconhece a escrita; nao redetecta
+            self.stats.record_received(self._estimate_size(no_val))
+
+        novo = v.atualizar()
+        if v._last_node is None or novo != v._last_node:
+            await v.node.write_value(novo)
+            v._last_node = novo
+            # Cada escrita gera notificacao DataChange p/ os clientes inscritos.
+            self.stats.record_sent(self._estimate_size(novo))
+            return True
+        return False
 
     @staticmethod
     def _estimate_size(valor) -> int:

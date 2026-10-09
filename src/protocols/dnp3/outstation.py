@@ -29,6 +29,7 @@ from .frames import (
     FLAG_ONLINE, IIN_CLASS1_EVENTS, IIN_CLASS2_EVENTS, IIN_CLASS3_EVENTS,
     IIN_DEVICE_RESTART, IIN_NEED_TIME,
     CROB_LATCH_ON, CROB_LATCH_OFF, CROB_PULSE_ON, CROB_CLOSE, CROB_TRIP,
+    CROB_STATUS_SUCCESS, CROB_STATUS_NO_SELECT,
 )
 from ...core.engine import BaseProtocolGenerator, SessionState
 from ...core.network_conditions import NetworkConditions
@@ -471,12 +472,27 @@ class DNP3Outstation(BaseProtocolGenerator):
     async def _handle_operate(self, conn: _OutstationConn, app: dict, direct: bool):
         for h in app["headers"]:
             for o in h.objects:
-                if not direct:
-                    sel = conn.selected.pop(o.index, None)
-                    if sel is None or time.time() - sel[2] > 10:
-                        logger.warning(f"  OPERATE sem SELECT valido no ponto {o.index}")
-                        continue
+                if direct:
+                    self._apply_command(o.index, o.value)
+                    o.status = CROB_STATUS_SUCCESS
+                    continue
+                # SBO: exige um SELECT previo, recente (<=10s) e que CASE com este
+                # OPERATE (mesmo grupo e mesmo control code). Senao, rejeita e
+                # devolve status != 0 -- sem aplicar o comando.
+                sel = conn.selected.pop(o.index, None)
+                if sel is None or time.time() - sel[2] > 10:
+                    logger.warning(f"  OPERATE sem SELECT valido no ponto {o.index}")
+                    o.status = CROB_STATUS_NO_SELECT
+                    continue
+                sel_group, sel_code, _ = sel
+                if sel_group != h.group or sel_code != o.value:
+                    logger.warning(
+                        f"  OPERATE diverge do SELECT no ponto {o.index} "
+                        f"(sel 0x{(sel_code or 0):02X} x op 0x{(o.value or 0):02X})")
+                    o.status = CROB_STATUS_NO_SELECT
+                    continue
                 self._apply_command(o.index, o.value)
+                o.status = CROB_STATUS_SUCCESS
         await self._send_response(conn, app["headers"],
                                   desc="DIRECT OPERATE Response" if direct
                                   else "OPERATE Response (SBO)", echo=True)
@@ -486,10 +502,16 @@ class DNP3Outstation(BaseProtocolGenerator):
         if pt is None:
             return
         if code in (CROB_LATCH_ON, CROB_CLOSE, CROB_PULSE_ON):
-            pt.value = True
+            val = True
         elif code in (CROB_LATCH_OFF, CROB_TRIP):
-            pt.value = False
-        logger.info(f"  >> Comando aplicado: BO[{index}] = {pt.value}")
+            val = False
+        else:
+            return                       # control code nao reconhecido: nao comanda
+        # Se o ponto esta amarrado ao modelo (is_input), apply_write() chama
+        # model.command() e o comando ACIONA a planta; senao, so reflete local.
+        pt.apply_write(val)
+        pt.value = val                   # feedback imediato (o modelo confirma no proximo tick)
+        logger.info(f"  >> Comando aplicado: BO[{index}] = {val}")
         # o efeito do comando e visivel a todos os masters
         self._broadcast_event(pt, ObjectGroup.BINARY_INPUT_EVENT, VAR_BI_EVENT_TIME)
 

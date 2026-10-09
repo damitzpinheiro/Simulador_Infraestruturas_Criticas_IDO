@@ -374,8 +374,11 @@ IEC104_ROLES = {
 }
 
 # DNP3: (group, index) -> (papel, is_input)
+# O disjuntor tem dois pontos: o Binary Input (status, lido do modelo) e o
+# Binary Output (comando; is_input=True -> apply_write chama model.command()).
 DNP3_ROLES = {
-    (1, 0): ("breaker", True),
+    (1, 0): ("breaker", False),    # g1  Binary Input  -> status do disjuntor
+    (10, 0): ("breaker", True),    # g10 Binary Output -> comando do disjuntor
     (30, 0): ("power", False),
     (30, 1): ("voltage", False),
     (30, 2): ("current", False),
