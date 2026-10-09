@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" font-family="'Helvetica Neue',Arial,sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#33406b"/>
+    </marker>
+    <marker id="arrowd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8a93a8"/>
+    </marker>
+  </defs>
+
+  <style>
+    .box  { fill:#E9EDF6; stroke:#9AA8C7; stroke-width:1.2; rx:6; }
+    .phys { fill:#EFECF6; stroke:#A99EC4; stroke-width:1.2; rx:6; }
+    .t    { fill:#1B2A55; font-weight:bold; text-anchor:middle; }
+    .sub  { fill:#4a5578; text-anchor:middle; }
+    .ctrl { stroke:#33406b; stroke-width:1.6; fill:none; }
+    .dash { stroke:#8a93a8; stroke-width:1.4; fill:none; stroke-dasharray:5 4; }
+    .lg   { fill:#333; text-anchor:start; }
+  </style>
+
+  <!-- Console -->
+  <rect class="box" x="230" y="18" width="180" height="38" rx="6"/>
+  <text class="t" x="320" y="42" font-size="14">Console interativo</text>
+
+  <!-- Engine -->
+  <rect class="box" x="205" y="80" width="230" height="52" rx="6"/>
+  <text class="t" x="320" y="102" font-size="14">Engine</text>
+  <text class="sub" x="320" y="120" font-size="11">orquestração · ciclo de vida · stats</text>
+
+  <!-- Protocol stacks -->
+  <!-- IEC104 -->
+  <rect class="box" x="20"  y="172" width="132" height="52" rx="6"/>
+  <text class="t"  x="86"  y="194" font-size="13">IEC 104</text>
+  <text class="sub" x="86"  y="211" font-size="11">slave / master</text>
+  <!-- DNP3 -->
+  <rect class="box" x="174" y="172" width="132" height="52" rx="6"/>
+  <text class="t"  x="240" y="194" font-size="13">DNP3</text>
+  <text class="sub" x="240" y="211" font-size="11">outstation / master</text>
+  <!-- OPC-UA -->
+  <rect class="box" x="328" y="172" width="132" height="52" rx="6"/>
+  <text class="t"  x="394" y="194" font-size="13">OPC-UA</text>
+  <text class="sub" x="394" y="211" font-size="11">server / client</text>
+  <!-- Gateway -->
+  <rect class="box" x="482" y="172" width="138" height="52" rx="6"/>
+  <text class="t"  x="551" y="194" font-size="13">Gateway</text>
+  <text class="sub" x="551" y="211" font-size="11">Modbus-TCP</text>
+
+  <!-- Physical model -->
+  <rect class="phys" x="150" y="306" width="340" height="54" rx="6"/>
+  <text class="t"  x="320" y="330" font-size="13">Modelo de processo coerente</text>
+  <text class="sub" x="320" y="348" font-size="11">estado físico da subestação</text>
+
+  <!-- Solid: control / protocol data -->
+  <path class="ctrl" d="M320,56 L320,78" marker-end="url(#arrow)"/>
+  <path class="ctrl" d="M320,132 L86,170"  marker-end="url(#arrow)"/>
+  <path class="ctrl" d="M320,132 L240,170" marker-end="url(#arrow)"/>
+  <path class="ctrl" d="M320,132 L394,170" marker-end="url(#arrow)"/>
+  <path class="ctrl" d="M320,132 L551,170" marker-end="url(#arrow)"/>
+
+  <!-- Dashed: physical state (all three protocol stacks + gateway bind/read the model) -->
+  <path class="dash" d="M86,224  L188,304" marker-end="url(#arrowd)"/>
+  <path class="dash" d="M240,224 L262,304" marker-end="url(#arrowd)"/>
+  <path class="dash" d="M394,224 L340,304" marker-end="url(#arrowd)"/>
+  <path class="dash" d="M551,224 L452,304" marker-end="url(#arrowd)"/>
+
+  <!-- Legend -->
+  <line class="ctrl" x1="150" y1="392" x2="188" y2="392" marker-end="url(#arrow)"/>
+  <text class="lg" x="196" y="396" font-size="11">controle / dados de protocolo</text>
+  <line class="dash" x1="392" y1="392" x2="430" y2="392" marker-end="url(#arrowd)"/>
+  <text class="lg" x="438" y="396" font-size="11">estado físico</text>
+</svg>

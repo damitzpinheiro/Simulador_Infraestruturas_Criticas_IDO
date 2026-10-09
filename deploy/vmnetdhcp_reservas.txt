@@ -1,0 +1,28 @@
+# ===== Reservas DHCP do laboratorio PFC (VMnet8 NAT, 192.168.21.0/24) =====
+# Adicione estas linhas ao arquivo:  C:\ProgramData\VMware\vmnetdhcp.conf
+# (coloque DEPOIS do bloco "subnet 192.168.21.0 ..."), salve como admin e
+# reinicie o servico "VMware DHCP Service". Depois reinicie as VMs.
+host pfc_hidro {
+    hardware ethernet 00:0c:29:b6:a1:e9;
+    fixed-address 192.168.21.11;
+}
+host pfc_termica {
+    hardware ethernet 00:50:56:38:28:88;
+    fixed-address 192.168.21.12;
+}
+host pfc_industrial {
+    hardware ethernet 00:50:56:3a:b9:e0;
+    fixed-address 192.168.21.13;
+}
+host pfc_centro {
+    hardware ethernet 00:50:56:25:58:15;
+    fixed-address 192.168.21.14;
+}
+host pfc_hospital {
+    hardware ethernet 00:50:56:3f:df:8f;
+    fixed-address 192.168.21.15;
+}
+host pfc_kali {
+    hardware ethernet 00:0c:29:db:fa:bc;
+    fixed-address 192.168.21.21;
+}

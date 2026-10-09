@@ -1,0 +1,22 @@
+# VM-HOSPITAL (bairro critico, DNP3). Outstation :20000 + plant_link :7070 + Modbus :5020.
+#   python main.py -c config/vm_hospital.yaml
+engine: { stats_interval: 20, log_level: INFO }
+network_conditions: { preset: ideal }
+load_profile: { type: constant }
+dnp3:
+  enabled: true
+  nodes:
+    - id: hospital
+      role: outstation
+      grid_entity: hospital
+      bind: 0.0.0.0
+      port: 20000
+      address: 5
+      master_address: 1
+      points:
+        - { index: 0, group: 1,  value: true }
+        - { index: 1, group: 30, value: 13.8, min: 0.0, max: 15.0,  noise: 0.0 }
+        - { index: 2, group: 30, value: 837.0, min: 0.0, max: 1500.0, noise: 0.0 }
+        - { index: 3, group: 30, value: 20.0, min: 0.0, max: 30.0,  noise: 0.0 }
+plant_link: { enabled: true, host: 0.0.0.0, port: 7070, tick_s: 1.0 }
+modbus:     { enabled: true, host: 0.0.0.0, port: 5020, unit_id: 1, allow_writes: false }

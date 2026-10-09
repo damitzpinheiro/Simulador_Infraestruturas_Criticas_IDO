@@ -1,0 +1,21 @@
+# VM-INDUSTRIAL (bairro, IEC104). Slave :2404 + plant_link :7070 + Modbus :5020.
+#   python main.py -c config/vm_industrial.yaml
+engine: { stats_interval: 20, log_level: INFO }
+network_conditions: { preset: ideal }
+load_profile: { type: constant }
+iec104:
+  enabled: true
+  nodes:
+    - id: industrial
+      role: slave
+      grid_entity: industrial
+      bind: 0.0.0.0
+      port: 2404
+      common_address: 1
+      datapoints:
+        - { ioa: 100, type_id: 1,  value: true }
+        - { ioa: 410, type_id: 13, value: 75.0, min: 0.0, max: 90.0,  noise: 0.0 }
+        - { ioa: 200, type_id: 13, value: 69.0, min: 0.0, max: 75.0,  noise: 0.0 }
+        - { ioa: 300, type_id: 13, value: 627.0, min: 0.0, max: 1200.0, noise: 0.0 }
+plant_link: { enabled: true, host: 0.0.0.0, port: 7070, tick_s: 1.0 }
+modbus:     { enabled: true, host: 0.0.0.0, port: 5020, unit_id: 1, allow_writes: false }

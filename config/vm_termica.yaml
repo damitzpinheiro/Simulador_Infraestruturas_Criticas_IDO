@@ -1,0 +1,25 @@
+# ===========================================================================
+# VM-TERMICA (usina, IEC104). Alvo do Caso 1 (injecao de comando).
+# Roda: slave IEC104 (:2404) + plant_link (:7070, canal c/ coordenador) +
+# gateway Modbus (:5020, p/ o SCADA-LTS ler ESTE RTU).
+#   python main.py -c config/vm_termica.yaml
+# ===========================================================================
+engine: { stats_interval: 20, log_level: INFO }
+network_conditions: { preset: ideal }
+load_profile: { type: constant }
+iec104:
+  enabled: true
+  nodes:
+    - id: termica
+      role: slave
+      grid_entity: termica
+      bind: 0.0.0.0                 # aceita o master (VM-Centro) e o MITM remotos
+      port: 2404
+      common_address: 1
+      datapoints:
+        - { ioa: 100, type_id: 1,  value: true }
+        - { ioa: 400, type_id: 13, value: 100.0, min: 0.0, max: 120.0, noise: 0.0 }
+        - { ioa: 200, type_id: 13, value: 138.0, min: 0.0, max: 145.0, noise: 0.0 }
+        - { ioa: 700, type_id: 13, value: 60.0, min: 55.0, max: 62.0, noise: 0.0 }
+plant_link: { enabled: true, host: 0.0.0.0, port: 7070, tick_s: 1.0 }
+modbus:     { enabled: true, host: 0.0.0.0, port: 5020, unit_id: 1, allow_writes: false }

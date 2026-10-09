@@ -1,0 +1,27 @@
+# ===========================================================================
+# VM-HIDRO (usina, OPC-UA). Alvo do Caso 2 (falsificacao de telemetria).
+# Server OPC-UA (:4840) + plant_link (:7070) + gateway Modbus (:5020).
+# ATENCAO: em OPC-UA o `host` e o endpoint ANUNCIADO -> troque pelo IP REAL desta VM
+# (o cliente/atacante conecta nesse IP). NAO use 0.0.0.0 aqui.
+#   python main.py -c config/vm_hidro.yaml
+# ===========================================================================
+engine: { stats_interval: 20, log_level: INFO }
+network_conditions: { preset: ideal }
+load_profile: { type: constant }
+opcua:
+  enabled: true
+  nodes:
+    - id: hidro
+      role: server
+      grid_entity: hidro
+      host: 192.168.21.11            # <- IP REAL desta VM (endpoint anunciado)
+      port: 4840
+      uri: "http://ime.eb.br/pfc/scada"
+      update_interval: 5.0
+      variables:
+        - { name: Disjuntor,     value: true }
+        - { name: Potencia_MW,   value: 45.0, min: 0.0, max: 60.0, noise: 0.0 }
+        - { name: Tensao_kV,     value: 138.0, min: 0.0, max: 145.0, noise: 0.0 }
+        - { name: Frequencia_Hz, value: 60.0, min: 55.0, max: 62.0, noise: 0.0 }
+plant_link: { enabled: true, host: 0.0.0.0, port: 7070, tick_s: 1.0 }
+modbus:     { enabled: true, host: 0.0.0.0, port: 5020, unit_id: 1, allow_writes: false }

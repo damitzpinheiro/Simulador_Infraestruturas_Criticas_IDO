@@ -1,0 +1,36 @@
+# ===========================================================================
+# VM-COORDENADOR (a "planta" fisica). Roda o CityGridModel e sincroniza os RTUs.
+# NAO tem slaves nem esta na rede SCADA: o canal com os RTUs e o "lado fisico"
+# (fiacao/linhas), out-of-band. Ajuste os IPs dos RTUs em `remotes`.
+#   python main.py -c config/vm_coordenador.yaml
+# ===========================================================================
+engine: { stats_interval: 20, retry_delay: 3, max_retries: -1, log_level: INFO }
+network_conditions: { preset: ideal }
+load_profile: { type: constant }
+
+coordinator:
+  enabled: true
+  tick_s: 1.0
+  remotes:                                  # <- troque pelos IPs reais das VMs dos RTUs
+    - { id: hidro,      host: 192.168.21.11, port: 7070 }
+    - { id: termica,    host: 192.168.21.12, port: 7070 }
+    - { id: industrial, host: 192.168.21.13, port: 7070 }
+    - { id: centro,     host: 192.168.21.14, port: 7070 }
+    - { id: hospital,   host: 192.168.21.15, port: 7070 }
+
+grid_model:
+  generators:
+    - { id: hidro,   p_max: 45.0,  p_set: 45.0,  bus_kv: 138.0, droop_mw_hz: 8.0,  blackstart: true }
+    - { id: termica, p_max: 110.0, p_set: 100.0, bus_kv: 138.0, droop_mw_hz: 10.0 }   # nao parte a frio
+  districts:
+    - { id: industrial, load_mw: 75.0, bus_kv: 69.0,  priority: 1 }
+    - { id: centro,     load_mw: 50.0, bus_kv: 69.0,  priority: 2 }
+    - { id: hospital,   load_mw: 20.0, bus_kv: 13.8,  priority: 3 }
+  inertia_mws: 120.0
+  damping_mw_hz: 15.0
+  load_noise: 0.015
+  ufls_enabled: true
+  ufls_stages: [59.0, 58.5, 58.0, 57.5]
+  ufls_delay_s: 0.6
+  gen_trip_hz: 57.0
+  gen_trip_delay_s: 1.5

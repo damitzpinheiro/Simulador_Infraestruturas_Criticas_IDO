@@ -1,0 +1,195 @@
+# ===========================================================================
+# CENARIO DA CIDADE (multimaquina) para a apresentacao do PFC.
+#
+#   2 usinas + 3 bairros, acoplados pela frequencia do sistema. O SCADA-LTS
+#   observa TODA a planta via gateway Modbus (:5020) e mostra a cidade apagando
+#   em cascata quando a rede perde geracao.
+#
+# Mapa de entidades -> protocolo (cada slave = uma usina/bairro):
+#   termica     (USINA, alvo do Caso 1)  -> IEC104  :2404
+#   industrial  (BAIRRO)                 -> IEC104  :2414
+#   centro      (BAIRRO)                 -> DNP3    :20000
+#   hospital    (BAIRRO, carga critica)  -> DNP3    :20010
+#   hidro       (USINA, alvo do Caso 2)  -> OPC-UA  :4840
+#
+# Caminhos de ataque (o "centro de controle" que o MITM intercepta):
+#   Caso 1 (cascata):     master IEC104 -> termica  (injecao de comando abre o disjuntor)
+#   Caso 2 (telemetria):  cliente OPC-UA -> hidro    (subst. de certificado falsifica leitura)
+#
+#   python main.py -c config/cidade_multimaquina.yaml
+# ===========================================================================
+
+engine:
+  stats_interval: 15
+  retry_delay: 5
+  max_retries: -1
+  log_level: INFO
+
+network_conditions:
+  preset: "ideal"
+
+load_profile:
+  type: "constant"
+
+# ---------------------------------------------------------------------------
+# IEC 104 : usina termica (Caso 1) + bairro industrial
+# ---------------------------------------------------------------------------
+iec104:
+  enabled: true
+  nodes:
+    - id: termica
+      role: slave
+      grid_entity: termica
+      host: 127.0.0.1
+      port: 2404
+      common_address: 1
+      spontaneous_interval: 5.0
+      periodic_interval: 12.0
+      datapoints:
+        - { ioa: 100, type_id: 1,  value: true }                                   # disjuntor da usina
+        - { ioa: 400, type_id: 13, value: 90.0, min: 0.0,  max: 120.0, noise: 0.0 } # potencia MW
+        - { ioa: 200, type_id: 13, value: 138.0, min: 0.0, max: 145.0, noise: 0.0 } # tensao kV
+        - { ioa: 700, type_id: 13, value: 60.0, min: 55.0, max: 62.0, noise: 0.0 }  # frequencia Hz (sistema)
+
+    - id: industrial
+      role: slave
+      grid_entity: industrial
+      host: 127.0.0.1
+      port: 2414
+      common_address: 2
+      spontaneous_interval: 5.0
+      periodic_interval: 12.0
+      datapoints:
+        - { ioa: 100, type_id: 1,  value: true }                                    # disjuntor do bairro
+        - { ioa: 410, type_id: 13, value: 75.0, min: 0.0, max: 90.0,  noise: 0.0 }  # carga MW
+        - { ioa: 200, type_id: 13, value: 69.0, min: 0.0, max: 75.0,  noise: 0.0 }  # tensao kV
+        - { ioa: 300, type_id: 13, value: 627.0, min: 0.0, max: 1200.0, noise: 0.0 } # corrente A
+
+    # Master (centro de controle) para a usina termica. SEM comandos legitimos
+    # (command_ioas vazio) para que so o ATAQUE injete a abertura do disjuntor.
+    - id: sala-controle
+      role: master
+      host: 127.0.0.1
+      port: 2404
+      common_address: 1
+      startup_delay: 2.0
+      gi_interval: 60.0
+      command_interval: 999999
+      command_ioas: []
+
+# ---------------------------------------------------------------------------
+# DNP3 : bairro centro + bairro hospital (carga critica)
+# ---------------------------------------------------------------------------
+dnp3:
+  enabled: true
+  nodes:
+    - id: centro
+      role: outstation
+      grid_entity: centro
+      host: 127.0.0.1
+      port: 20000
+      address: 4
+      master_address: 1
+      event_scan_interval: 5.0
+      points:
+        - { index: 0, group: 1,  value: true }                                    # disjuntor do bairro
+        - { index: 1, group: 30, value: 69.0, min: 0.0, max: 75.0,  noise: 0.0 }  # tensao kV
+        - { index: 2, group: 30, value: 418.0, min: 0.0, max: 900.0, noise: 0.0 } # corrente A
+        - { index: 3, group: 30, value: 50.0, min: 0.0, max: 70.0,  noise: 0.0 }  # carga MW
+
+    - id: hospital
+      role: outstation
+      grid_entity: hospital
+      host: 127.0.0.1
+      port: 20010
+      address: 5
+      master_address: 1
+      event_scan_interval: 5.0
+      points:
+        - { index: 0, group: 1,  value: true }                                    # disjuntor do bairro
+        - { index: 1, group: 30, value: 13.8, min: 0.0, max: 15.0,  noise: 0.0 }  # tensao kV
+        - { index: 2, group: 30, value: 837.0, min: 0.0, max: 1500.0, noise: 0.0 } # corrente A
+        - { index: 3, group: 30, value: 20.0, min: 0.0, max: 30.0,  noise: 0.0 }  # carga MW
+
+    - id: sala-controle
+      role: master
+      host: 127.0.0.1
+      port: 20000
+      address: 1
+      outstation_address: 4
+      startup_delay: 2.5
+      integrity_interval: 60.0
+      command_interval: 999999
+      command_indexes: []
+
+# ---------------------------------------------------------------------------
+# OPC-UA : usina hidro (Caso 2 - falsificacao de telemetria)
+# ---------------------------------------------------------------------------
+opcua:
+  enabled: true
+  nodes:
+    - id: hidro
+      role: server
+      grid_entity: hidro
+      host: 127.0.0.1
+      port: 4840
+      uri: "http://ime.eb.br/pfc/scada"
+      update_interval: 5.0
+      variables:
+        - { name: Disjuntor,      value: true }                              # disjuntor da usina
+        - { name: Potencia_MW,    value: 55.0, min: 0.0, max: 60.0, noise: 0.0 }
+        - { name: Tensao_kV,      value: 138.0, min: 0.0, max: 145.0, noise: 0.0 }
+        - { name: Frequencia_Hz,  value: 60.0, min: 55.0, max: 62.0, noise: 0.0 }
+
+    - id: sala-controle
+      role: client
+      url: "opc.tcp://127.0.0.1:4840/scada/server/"
+      startup_delay: 5.0
+      publishing_interval: 5000.0
+      read_interval: 10.0
+      write_interval: 999999
+
+# ---------------------------------------------------------------------------
+# Gateway Modbus-TCP: janela unica de leitura para o SCADA-LTS ver TODA a cidade.
+# Espelha automaticamente os pontos dos 5 slaves (auto: sources vazio).
+# ---------------------------------------------------------------------------
+modbus:
+  enabled: true
+  host: "0.0.0.0"
+  port: 5020
+  unit_id: 1
+  allow_writes: false
+  sources: []
+
+# ---------------------------------------------------------------------------
+# Modelo de rede da cidade (multimaquina). A fisica que faz a cascata.
+# ---------------------------------------------------------------------------
+grid_model:
+  enabled: true
+  tick_s: 1.0
+
+  # 2 usinas: geracao base = 45 + 100 = 145 MW (= carga total -> f = 60.0 estavel).
+  # A hidro roda no maximo (sem reserva): quando a termica cai, sobra pouca geracao
+  # e a UFLS precisa cortar DOIS bairros (industrial e centro) para segurar a rede,
+  # deixando so o hospital (carga critica). Aumente hidro.p_max p/ suavizar a cascata.
+  generators:
+    - { id: hidro,   p_max: 45.0,  p_set: 45.0, bus_kv: 138.0, droop_mw_hz: 8.0,  blackstart: true }
+    - { id: termica, p_max: 110.0, p_set: 100.0, bus_kv: 138.0, droop_mw_hz: 10.0 }   # nao parte a frio
+
+  # 3 bairros: carga total = 75 + 50 + 20 = 145 MW. prioridade menor corta primeiro.
+  districts:
+    - { id: industrial, load_mw: 75.0, bus_kv: 69.0,  priority: 1 }   # corta 1o
+    - { id: centro,     load_mw: 50.0, bus_kv: 69.0,  priority: 2 }   # corta 2o
+    - { id: hospital,   load_mw: 20.0, bus_kv: 13.8,  priority: 3 }   # critico: corta por ultimo
+
+  # Dinamica de frequencia (equacao de swing) ajustada para ser visivel em segundos
+  inertia_mws: 120.0        # inercia agregada (MW.s) - maior = cai mais devagar
+  damping_mw_hz: 15.0       # amortecimento (MW/Hz)
+  load_noise: 0.015         # ruido de carga (telemetria viva)
+
+  # Protecao de subfrequencia (UFLS): estagios de corte de carga
+  ufls_enabled: true
+  ufls_stages: [59.0, 58.5, 58.0, 57.5]
+  ufls_delay_s: 0.6         # atraso do rele antes de cortar um bairro
+  gen_trip_hz: 57.0         # abaixo disto as usinas restantes disparam (colapso total)
+  gen_trip_delay_s: 1.5

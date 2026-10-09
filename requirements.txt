@@ -1,0 +1,5 @@
+# Configuracao de cenarios (obrigatorio)
+pyyaml>=6.0
+
+# OPC-UA. IEC 104 e DNP3 tem codec proprio e nao dependem de nada.
+asyncua>=1.0

@@ -1,0 +1,62 @@
+# Perfil para o laboratorio MITM (on-path) IEC 104.
+#
+# O slave real fica na porta 2405 e o master conecta na 2404 (onde o proxy
+# mitm.py escuta). Assim o atacante fica ENTRE os dois:
+#
+#   master -> :2404 (proxy mitm.py) -> :2405 (slave real)
+#
+# Fluxo:
+#   Terminal A:  python main.py -c config/mitm_iec104.yaml
+#   Terminal B:  python mitm.py
+#
+# O master fica tentando conectar em :2404 ate o proxy subir (retry automatico).
+
+engine:
+  stats_interval: 15
+  retry_delay: 3
+  max_retries: -1
+  log_level: INFO
+
+network_conditions:
+  preset: "ideal"
+
+load_profile:
+  type: "constant"
+
+iec104:
+  enabled: true
+  slave:
+    host: "127.0.0.1"
+    port: 2405              # slave real atras do proxy
+    common_address: 1
+    originator: 0
+    t1: 15
+    t2: 10
+    t3: 20
+    k: 12
+    w: 8
+    spontaneous_interval: 2.0
+    periodic_interval: 10.0
+    gi_response_delay: 0.05
+  master:
+    host: "127.0.0.1"
+    port: 2404              # master fala com o PROXY, nao direto com o slave
+    common_address: 1
+    originator: 0
+    startup_delay: 1.5
+    t1: 15
+    t2: 10
+    t3: 20
+    k: 12
+    w: 8
+    gi_interval: 60.0
+    command_interval: 15.0
+    clock_sync_interval: 120.0
+    testfr_interval: 30.0
+    command_ioas: [100, 101, 102, 103]
+
+dnp3:
+  enabled: false
+
+opcua:
+  enabled: false

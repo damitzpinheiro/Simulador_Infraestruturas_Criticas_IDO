@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Ambiente virtual
+venv/
+.venv/
+env/
+
+# Certificados de laboratorio (gerados automaticamente em runtime)
+certs/
+
+# Capturas e artefatos temporarios
+*.pcap
+*.pcapng
+*.log
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

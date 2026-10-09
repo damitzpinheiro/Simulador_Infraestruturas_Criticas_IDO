@@ -1,0 +1,74 @@
+# ===========================================================================
+# Operacao MULTI-MAQUINA com UM MASTER -> N SLAVES (centro de controle polando
+# varios RTUs). Fase 3 + master multi-alvo do PLANEJAMENTO_MULTIMAQUINA.md.
+#
+# Cenario:
+#   - VMs   (192.168.21.129, .130, ...) = SERVIDORES (slave / outstation / server)
+#   - Windows host (192.168.21.1)       = MASTER unico com varios alvos (--role master)
+#
+# Lembrete: no IEC 104/DNP3 o SLAVE/OUTSTATION e o servidor TCP (faz bind, escuta);
+# o MASTER e o cliente (conecta). Cada RTU fica na porta PADRAO (2404/20000/4840)
+# na sua PROPRIA maquina; o que os diferencia e o IP.
+#
+# Como rodar:
+#   Em cada VM (um RTU):  python3 main.py -c config/<so-o-slave-daquela-vm>.yaml --role slave
+#   No host (o master):   python  main.py -c config/distribuido.yaml            --role master
+#
+# ATENCAO aos slaves em VMs diferentes: `--role slave` sobe TODOS os slaves do
+# arquivo naquela maquina. Como cada VM tem o seu, use um config por VM contendo
+# apenas o slave daquela VM (todos na porta padrao), e deixe este arquivo (com o
+# master multi-alvo) no host. Para varios slaves na MESMA maquina, use portas
+# distintas (ver config/multi_instancia.yaml).
+#
+# Firewall NA VM (lado servidor). Ubuntu, como root:
+#   ufw allow 2404/tcp && ufw allow 20000/tcp && ufw allow 4840/tcp
+# ===========================================================================
+
+engine:
+  stats_interval: 10
+  retry_delay: 5
+  max_retries: -1
+
+network_conditions:
+  preset: "ideal"
+
+load_profile:
+  type: "constant"
+
+iec104:
+  enabled: true
+  nodes:
+    # Servidor (roda na VM). Porta padrao 2404, bind em todas as interfaces.
+    - { id: slave-1, role: slave, bind: 0.0.0.0, port: 2404, common_address: 1 }
+    # Master unico no host: uma conexao por RTU (um alvo por VM).
+    - id: master
+      role: master
+      startup_delay: 1.5
+      targets:
+        - { host: 192.168.21.129, port: 2404, common_address: 1 }   # RTU na VM 1
+        # - { host: 192.168.21.130, port: 2404, common_address: 2 } # RTU na VM 2 (descomente)
+
+dnp3:
+  enabled: true
+  nodes:
+    - { id: outstation-1, role: outstation, bind: 0.0.0.0, port: 20000, address: 4, master_address: 1 }
+    - id: master
+      role: master
+      startup_delay: 2.0
+      address: 1
+      targets:
+        - { host: 192.168.21.129, port: 20000, outstation_address: 4 }   # RTU na VM 1
+        # - { host: 192.168.21.130, port: 20000, outstation_address: 5 } # RTU na VM 2
+
+# OPC-UA: o server anuncia pelo host do endpoint (o IP real da VM). O cliente
+# unico abre uma sessao por servidor.
+opcua:
+  enabled: true
+  nodes:
+    - { id: server-1, role: server, host: 192.168.21.129, port: 4840, uri: "http://ime.eb.br/pfc/scada" }
+    - id: client
+      role: client
+      startup_delay: 4.0
+      targets:
+        - { url: "opc.tcp://192.168.21.129:4840/scada/server/" }   # servidor na VM 1
+        # - { url: "opc.tcp://192.168.21.130:4840/scada/server/" } # servidor na VM 2
